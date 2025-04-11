@@ -1,6 +1,10 @@
-# Remote MCP Server on Cloudflare
+# Remote MCP Server on Cloudflare with Bearer Auth
 
-Let's get a remote MCP server up-and-running on Cloudflare Workers complete with OAuth login!
+This is a fork of https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-server that removes the OAuth code and instead allows a Bearer Token to be passed in with the Authorization HTTP header.
+
+In the MCP Inspector you can pass a Bearer Token like this:
+
+<img width="375" alt="Monosnap MCP Inspector 2025-04-11 11-31-37" src="https://github.com/user-attachments/assets/e8776926-d9ee-47dd-87e6-b5c52baeca63" />
 
 ## Develop locally
 
@@ -23,17 +27,9 @@ You should be able to open [`http://localhost:8787/`](http://localhost:8787/) in
 To explore your new MCP api, you can use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector).
 
 - Start it with `npx @modelcontextprotocol/inspector`
-- [Within the inspector](http://localhost:5173), switch the Transport Type to `SSE` and enter `http://localhost:8787/sse` as the URL of the MCP server to connect to, and click "Connect"
-- You will navigate to a (mock) user/password login screen. Input any email and pass to login.
-- You should be redirected back to the MCP Inspector and you can now list and call any defined tools!
-
-<div align="center">
-  <img src="img/mcp-inspector-sse-config.png" alt="MCP Inspector with the above config" width="600"/>
-</div>
-
-<div align="center">
-  <img src="img/mcp-inspector-successful-tool-call.png" alt="MCP Inspector with after a tool call" width="600"/>
-</div>
+- [Within the inspector](http://localhost:5173), switch the Transport Type to `SSE` and enter `http://localhost:8787/sse` as the URL of the MCP server to connect to
+- Under "Authentication" add your Bearer Token
+- click "Connect"
 
 ## Connect Claude Desktop to your local MCP server
 
@@ -44,12 +40,17 @@ Open the file in your text editor and replace it with this configuration:
 ```json
 {
   "mcpServers": {
-    "math": {
+    "remote-example": {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8787/sse"
+        "[https://remote.mcp.server/sse](http://localhost:8787/sse)",
+        "--header",
+        "Authorization: Bearer ${AUTH_TOKEN}"
       ]
+    },
+    "env": {
+      "AUTH_TOKEN": "..."
     }
   }
 }
@@ -90,12 +91,17 @@ Update the Claude configuration file to point to your `workers.dev` URL (ex: `wo
 ```json
 {
   "mcpServers": {
-    "math": {
+    "remote-example": {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://worker-name.account-name.workers.dev/sse"
+        "[https://remote.mcp.server/sse](http://localhost:8787/sse)",
+        "--header",
+        "Authorization: Bearer ${AUTH_TOKEN}"
       ]
+    },
+    "env": {
+      "AUTH_TOKEN": "..."
     }
   }
 }
