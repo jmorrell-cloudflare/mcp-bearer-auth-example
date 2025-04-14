@@ -4,7 +4,7 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "remote-mcp-server",
+  "name": "bearer-mcp-demo",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-10",
   "migrations": [
@@ -21,12 +21,6 @@
       }
     ]
   },
-  "kv_namespaces": [
-    {
-      "binding": "OAUTH_KV",
-      "id": "<ADD YOUR KV NAMESPACEID HERE>"
-    }
-  ],
   "observability": {
     "enabled": true
   },
