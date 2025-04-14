@@ -1,8 +1,10 @@
-import app from "./app";
+import defaultHandler from "./app";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BearerAuthProvider } from "./bearerAuthProvider";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { bearerAuth } from "hono/bearer-auth";
 
 type MyMcpProps = Record<string, unknown> & {
   accessToken: string;
@@ -28,67 +30,45 @@ export class MyMcp extends McpAgent<Env, unknown, MyMcpProps> {
   }
 }
 
-// BearerAuthProvider version
-export default new BearerAuthProvider({
-  apiRoute: "/sse",
-  // @ts-ignore
-  apiHandler: MyMcp.mount("/sse", {
-    binding: "MCP_OBJECT",
-    corsOptions: {
-      origin: "*",
-      methods: "GET, POST, OPTIONS",
-      headers: "Content-Type, Authorization",
+const app = new Hono<{ Bindings: Env }>();
+
+app.use(
+  "/sse",
+  cors(),
+  bearerAuth({
+    verifyToken: async (token, c) => {
+      // McpAgent expects `props` to be set on `executionCtx`
+      c.executionCtx.props.accessToken = token;
+      return token.length === 4;
     },
-  }),
-  // @ts-ignore
-  defaultHandler: app,
-  // custom validation
-  validateToken: async (token: string) => {
-    if (token.length !== 4) {
-      return new Error("Invalid token: Must be 4 characters long");
-    }
-    return null;
-  },
-});
+  })
+);
+app.mount(
+  "/sse",
+  MyMcp.mount("/sse", { binding: "MCP_OBJECT" }).fetch,
+  // Hono's .mount normally rewrites pathnames, but skip that this time so MyMcp knows the real paths
+  { replaceRequest: (req) => req }
+);
 
-// More explicit / less magic version
-// This is approximately what the BearerAuthProvider does under the hood
-//
-// const mcpAgent = MyMcp.mount("/sse", {
-//   binding: "MCP_OBJECT",
-//   corsOptions: {
-//     origin: "*",
-//     methods: "GET, POST, OPTIONS",
-//     headers: "Content-Type, Authorization",
-//   },
-// });
-//
-// export default {
-//   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-//     const basePattern = new URLPattern({ pathname: "/sse" });
-//     const messagePattern = new URLPattern({ pathname: "/sse/message" });
+// Alternative API, all in one routing call, no mutating of executionCtx
 
-//     if (basePattern.test(request.url) || messagePattern.test(request.url)) {
-//       const accessToken = request.headers
-//         .get("Authorization")
-//         ?.replace("Bearer ", "");
+/*
 
-//       if (!accessToken) {
-//         return new Response("Unauthorized", { status: 401 });
-//       }
+app.on(['get', 'post'], '/sse/*', cors(), bearerAuth({
+  verifyToken: async (token, c) => {
+    c.set('accessToken', token)
+    return token.length === 4
+  }
+}), (c) => {
+  // Need a little bit of massaging to get Hono to call a standard worker .fetch API
+  return MyMcp.mount("/sse", {
+    binding: "MCP_OBJECT",
+  }).fetch(c.req.raw, c.env, {...c.executionCtx, accessToken: c.get('accessToken') });
+})
 
-//       // pass any info we need in the agent via ctx.props
-//       // this will be available in the agent via `this.props`
-//       // and McpAgent will handle storing / restoring it as
-//       // the agent is hibernated / resumed
-//       ctx.props = {
-//         accessToken,
-//       };
+*/
 
-//       // @ts-ignore
-//       return mcpAgent.fetch(request, env, ctx);
-//     }
+// Serve the rest of the app on '/'
+app.mount("/", defaultHandler.fetch);
 
-//     return app.fetch(request);
-//   },
-// };
+export default app;
